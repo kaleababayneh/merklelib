@@ -1,0 +1,17 @@
+{
+  "name": "merklelib",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "@node101/merkle-tree": "^0.0.8",
+    "html-to-json-parser": "^2.0.1"
+  }
+}
