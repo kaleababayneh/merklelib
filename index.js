@@ -5,6 +5,7 @@ let htmlString = `<html lang="en">
                     <head>
                         <meta charset="UTF-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <meta name="keywords" content="world, item">
                         <title>Document</title>
                     </head>
                     <body>
@@ -30,14 +31,21 @@ async function parsedHTML() {
 }
 
 
-function extract(obj, result, path = []) {
+function extract(obj, result, path = [], childCounters = {}) {
   // Skip if not an object
   if (!obj || typeof obj !== 'object') return;
   
-  // Build tag representation with attributes
+  // Build tag representation with attributes and position
   const currentType = obj.type;
   if (currentType) {
-    let tagRepresentation = currentType;
+    // Track this element's position among siblings of same type
+    if (!childCounters[currentType]) {
+      childCounters[currentType] = 1;
+    } else {
+      childCounters[currentType]++;
+    }
+    
+    let tagRepresentation = `${currentType}:${childCounters[currentType]}`;
     
     // Add attributes to the tag representation if they exist
     if (obj.attributes && Object.keys(obj.attributes).length > 0) {
@@ -55,6 +63,9 @@ function extract(obj, result, path = []) {
   
   // Process content of current element
   if (currentType) {
+    // Reset child counters for this level's children
+    const contentChildCounters = {};
+    
     if (Array.isArray(obj.content)) {
       for (const item of obj.content) {
         if (typeof item === 'string') {
@@ -64,7 +75,7 @@ function extract(obj, result, path = []) {
             result.push(`${path.join('>')}:${cleanedValue}`);
           }
         } else if (item && typeof item === 'object') {
-          extract(item, result, path);
+          extract(item, result, path, contentChildCounters);
         }
       }
     } 
@@ -79,7 +90,7 @@ function extract(obj, result, path = []) {
   // Process all other properties for nested elements
   for (const key in obj) {
     if (key !== 'type' && key !== 'content' && key !== 'attributes' && obj[key] && typeof obj[key] === 'object') {
-      extract(obj[key], result, path);
+      extract(obj[key], result, path, {});
     }
   }
   
@@ -90,12 +101,15 @@ function extract(obj, result, path = []) {
 }
 
 function extractValues(json_object) { 
-
   if (typeof json_object === 'string') json_object = JSON.parse(json_object)
   
   const result = [];
-  extract(json_object, result);
+  extract(json_object, result, [], {});
   return result;
+}
+
+function extractKeyWords(json_object) { 
+  // extract keywords from the meta tag
 }
 
 function generateMerkleTreeFromLeaves(leaves) {
