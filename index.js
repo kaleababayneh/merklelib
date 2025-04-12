@@ -20,6 +20,7 @@ let htmlString = `<html lang="en">
                         <div>
                             <p>Another paragraph inside a div.</p>
                             <a href="https://example.com">Link</a>
+                            <a href="https://example.com">Link</a>
                         </div>dd
                     </body>
                  </html>`;
@@ -30,15 +31,13 @@ async function parsedHTML() {
   return result;
 }
 
-
 function extract(obj, result, path = [], childCounters = {}) {
-  // Skip if not an object
+
   if (!obj || typeof obj !== 'object') return;
-  
-  // Build tag representation with attributes and position
+
   const currentType = obj.type;
+
   if (currentType) {
-    // Track this element's position among siblings of same type
     if (!childCounters[currentType]) {
       childCounters[currentType] = 1;
     } else {
@@ -47,7 +46,6 @@ function extract(obj, result, path = [], childCounters = {}) {
     
     let tagRepresentation = `${currentType}:${childCounters[currentType]}`;
     
-    // Add attributes to the tag representation if they exist
     if (obj.attributes && Object.keys(obj.attributes).length > 0) {
       const attributeStrings = [];
       for (const [key, value] of Object.entries(obj.attributes)) {
@@ -57,11 +55,9 @@ function extract(obj, result, path = [], childCounters = {}) {
         tagRepresentation += `[${attributeStrings.join(',')}]`;
       }
     }
-    
     path.push(tagRepresentation);
   }
   
-  // Process content of current element
   if (currentType) {
     // Reset child counters for this level's children
     const contentChildCounters = {};
@@ -109,7 +105,33 @@ function extractValues(json_object) {
 }
 
 function extractKeyWords(json_object) { 
-  // extract keywords from the meta tag
+  if (typeof json_object === 'string') json_object = JSON.parse(json_object);
+  
+  // Look for the head element first
+  if (json_object.content) {
+    for (const item of json_object.content) {
+      // Find the head element
+      if (item && item.type === 'head' && item.content) {
+        // Look for meta tags within head
+        for (const headItem of item.content) {
+          if (headItem && 
+              headItem.type === 'meta' && 
+              headItem.attributes && 
+              headItem.attributes.name === 'keywords' && 
+              headItem.attributes.content) {
+            
+            // Split and clean the keywords
+            return headItem.attributes.content
+              .split(',')
+              .map(keyword => keyword.trim())
+              .filter(keyword => keyword.length > 0);
+          }
+        }
+      }
+    }
+  }
+  
+  return []; // Return empty array if no keywords found
 }
 
 function generateMerkleTreeFromLeaves(leaves) {
@@ -118,14 +140,16 @@ function generateMerkleTreeFromLeaves(leaves) {
 }
 
 
-
 function main() {
     parsedHTML()
       .then((parsed_value) => {
         const leaves =  extractValues(parsed_value);
+        const keywords = extractKeyWords(parsed_value);
+        console.log("Keywords ", keywords)
         console.log("Leaves ", leaves)
+        console.log("Parsed HTML ", parsed_value)
         const generatedTree = generateMerkleTreeFromLeaves(leaves);
-        console.log('Generated Merkle Tree:', generatedTree);
+        //console.log('Generated Merkle Tree:', generatedTree);
 
       })
       .catch((error) => {
