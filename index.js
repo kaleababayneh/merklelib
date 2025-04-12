@@ -14,6 +14,7 @@ let htmlString = `<html lang="en">
                             <li data-openseo-id="1">Item 1</li>
                             <li data-openseo-id="2">Item 2</li>
                             <li>Item 3</li>     
+                             <li>Item 3</li>     
                         </ul>
                         <div>
                             <p>Another paragraph inside a div.</p>
@@ -27,42 +28,39 @@ async function parsedHTML() {
   let result = await HTMLToJSON(cleanedHtmlString.trim(), true);
   return result;
 }
-// function extract(obj, result) {
-//   for (const key in obj) {
-//     if (obj[key] && typeof obj[key] === 'object') {
-//       extract(obj[key], result);  
-//     } else {
-//       const leafValue =obj[key].replaceAll(/[\s\r\n]/g, '');
-//       result.push(leafValue); 
-//     }
-//   }
-// }
 
-
-
-// function extractValues(json_object) {
-//   console.log("JSON Object ", json_object)
-//     json_object = JSON.parse(json_object);  
-//     const result = [];
-//     extract(json_object, result);  
-//     return result;
-// }
 
 function extract(obj, result, path = []) {
-
+  // Skip if not an object
   if (!obj || typeof obj !== 'object') return;
   
+  // Build tag representation with attributes
   const currentType = obj.type;
   if (currentType) {
-    path.push(currentType);
+    let tagRepresentation = currentType;
+    
+    // Add attributes to the tag representation if they exist
+    if (obj.attributes && Object.keys(obj.attributes).length > 0) {
+      const attributeStrings = [];
+      for (const [key, value] of Object.entries(obj.attributes)) {
+        attributeStrings.push(`${key}=${value}`);
+      }
+      if (attributeStrings.length > 0) {
+        tagRepresentation += `[${attributeStrings.join(',')}]`;
+      }
+    }
+    
+    path.push(tagRepresentation);
   }
   
+  // Process content of current element
   if (currentType) {
     if (Array.isArray(obj.content)) {
       for (const item of obj.content) {
         if (typeof item === 'string') {
           const cleanedValue = item.replaceAll(/[\s\r\n]/g, '');
           if (cleanedValue) {
+            // Join the path with '>' to create full hierarchy
             result.push(`${path.join('>')}:${cleanedValue}`);
           }
         } else if (item && typeof item === 'object') {
@@ -78,23 +76,25 @@ function extract(obj, result, path = []) {
     }
   }
   
+  // Process all other properties for nested elements
   for (const key in obj) {
-    if (key !== 'type' && key !== 'content' && obj[key] && typeof obj[key] === 'object') {
+    if (key !== 'type' && key !== 'content' && key !== 'attributes' && obj[key] && typeof obj[key] === 'object') {
       extract(obj[key], result, path);
     }
   }
   
+  // Remove current type from path when done with this object
   if (currentType) {
     path.pop();
   }
 }
 
-function extractValues(json_object) {
-  console.log("JSON Object ", json_object);
-  const parsed = typeof json_object === 'string' ? JSON.parse(json_object) : json_object;
+function extractValues(json_object) { 
+
+  if (typeof json_object === 'string') json_object = JSON.parse(json_object)
   
   const result = [];
-  extract(parsed, result);
+  extract(json_object, result);
   return result;
 }
 
