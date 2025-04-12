@@ -11,8 +11,8 @@ let htmlString = `<html lang="en">
                         <h1>Hello World</h1>
                         <p>This is a paragraph.</p>
                         <ul>
-                            <li>Item 1</li>
-                            <li>Item 2</li>
+                            <li data-openseo-id="1">Item 1</li>
+                            <li data-openseo-id="2">Item 2</li>
                             <li>Item 3</li>     
                         </ul>
                         <div>
@@ -48,42 +48,44 @@ async function parsedHTML() {
 //     return result;
 // }
 
-// ...existing code...
-function extract(obj, result) {
-  // Skip if not an object
+function extract(obj, result, path = []) {
+
   if (!obj || typeof obj !== 'object') return;
   
-  // Process an element with type
-  if (obj.type) {
-    // Handle content array
+  const currentType = obj.type;
+  if (currentType) {
+    path.push(currentType);
+  }
+  
+  if (currentType) {
     if (Array.isArray(obj.content)) {
       for (const item of obj.content) {
-        // Extract text content with type prefix
         if (typeof item === 'string') {
           const cleanedValue = item.replaceAll(/[\s\r\n]/g, '');
           if (cleanedValue) {
-            result.push(`${obj.type}:${cleanedValue}`);
+            result.push(`${path.join('>')}:${cleanedValue}`);
           }
         } else if (item && typeof item === 'object') {
-          // Process nested elements
-          extract(item, result);
+          extract(item, result, path);
         }
       }
     } 
-    // Handle direct string content
     else if (typeof obj.content === 'string') {
       const cleanedValue = obj.content.replaceAll(/[\s\r\n]/g, '');
       if (cleanedValue) {
-        result.push(`${obj.type}:${cleanedValue}`);
+        result.push(`${path.join('>')}:${cleanedValue}`);
       }
     }
   }
   
-  // Process all properties for nested elements
   for (const key in obj) {
     if (key !== 'type' && key !== 'content' && obj[key] && typeof obj[key] === 'object') {
-      extract(obj[key], result);
+      extract(obj[key], result, path);
     }
+  }
+  
+  if (currentType) {
+    path.pop();
   }
 }
 
@@ -95,7 +97,6 @@ function extractValues(json_object) {
   extract(parsed, result);
   return result;
 }
-// ...existing code...
 
 function generateMerkleTreeFromLeaves(leaves) {
     const merkleTree = generateMerkleTree(leaves);
@@ -109,8 +110,8 @@ function main() {
       .then((parsed_value) => {
         const leaves =  extractValues(parsed_value);
         console.log("Leaves ", leaves)
-        //const generatedTree = generateMerkleTreeFromLeaves(leaves);
-        //console.log('Generated Merkle Tree:', generatedTree);
+        const generatedTree = generateMerkleTreeFromLeaves(leaves);
+        console.log('Generated Merkle Tree:', generatedTree);
 
       })
       .catch((error) => {
