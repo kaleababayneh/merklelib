@@ -1,5 +1,6 @@
 import { HTMLToJSON } from 'html-to-json-parser';
-import { generateMerkleTree } from "@node101/merkle-tree"
+import { generateMerkleProof, generateMerkleTree } from "@node101/merkle-tree"
+import { sha256 } from 'js-sha256';
 
 let htmlString = `<html lang="en">
                     <head>
@@ -11,39 +12,7 @@ let htmlString = `<html lang="en">
                     <body>
                         <h1>Hello World</h1>
                         <p>This is a paragraph.</p>
-                        <ul>
-                            <li data-openseo-id="1">Item 1</li>
-                            <li data-openseo-id="2">Item 2</li>
-                            <li>Item 3</li>     
-                             <li>Item 3</li>     
-                        </ul>
-
-                        <div>
-                              <p>Another One</p>
-                              <p>Another One</p>
-                              <p>Another One</p>
-                              <p>Another One</p>
-                        </div>
-
-                        <div>
-                              <p>Another One</p>
-                              <p>Another One</p>
-                              <p>Another One</p>
-                              <p>Another One</p>
-                        </div>
-
-                         <ul>
-                            <li data-openseo-id="1">Item 1</li>
-                            <li data-openseo-id="2">Item 2</li>
-                            <li>Item 3</li>     
-                             <li>Item 3</li>     
-                        </ul>
-
-                        <div>
-                            <p>Another paragraph inside a div.</p>
-                            <a href="https://example.com">Link</a>
-                            <a href="https://example.com">Link</a>
-                        </div>dd
+                    
                     </body>
                  </html>`;
     
@@ -156,11 +125,25 @@ function generateMerkleTreeFromLeaves(leaves) {
     return merkleTree;
 }
 
-
-function searchContent(obj, keywords, matchingTags) {
+function searchContent(obj, keywords, matchingTags, path = [], childCounters = {}) {
   if (!obj || typeof obj !== 'object') return;
   
-  if (obj.type) {
+  const currentType = obj.type;
+  if (currentType) {
+    // Build path representation like in extract()
+    childCounters[currentType] = (childCounters[currentType] || 0) + 1;
+    let tagRepresentation = `${currentType}:${childCounters[currentType]}`;
+    
+    if (obj.attributes && Object.keys(obj.attributes).length > 0) {
+      const attributeStrings = Object.entries(obj.attributes).map(
+        ([key, value]) => `${key}=${value}`
+      );
+      tagRepresentation += `[${attributeStrings.join(',')}]`;
+    }
+    
+    path.push(tagRepresentation);
+    
+    // Existing content extraction
     let foundKeyword = null;
     let textContent = '';
     
@@ -182,56 +165,80 @@ function searchContent(obj, keywords, matchingTags) {
     }
     
     if (foundKeyword) {
-      // Just include the parent tag info
+      const cleanedContent = textContent.trim().replace(/\s+/g, '');
+      // Include the full tag path in results
       matchingTags.push({
-        tag: obj.type,
+       // tag: obj.type,
         keyword: foundKeyword,
-        // fullTag: obj.type + (obj.attributes ? JSON.stringify(obj.attributes) : ''),
+        fulltag: `${path.join('>')}:${cleanedContent}`
       });
     }
     
     // Continue searching in child elements
     if (Array.isArray(obj.content)) {
+      const contentChildCounters = {}; // Reset counters for children
       for (const item of obj.content) {
         if (typeof item === 'object') {
-          searchContent(item, keywords, matchingTags);
+          searchContent(item, keywords, matchingTags, path, contentChildCounters);
         }
       }
     }
+    
+    path.pop(); // Remove from path when done
   }
   
   // Check other properties
   for (const key in obj) {
-    if (key !== 'type' && key !== 'content' && obj[key] && typeof obj[key] === 'object') {
-      searchContent(obj[key], keywords, matchingTags);
+    if (key !== 'type' && key !== 'content' && key !== 'attributes' && obj[key] && typeof obj[key] === 'object') {
+      searchContent(obj[key], keywords, matchingTags, path, {});
     }
   }
 }
 
 function tagsThatIncludeKeywords(json_object, keywords) {
-
   if (typeof json_object === 'string') json_object = JSON.parse(json_object);
   if (!keywords || keywords.length === 0) return [];
 
   const matchingTags = [];
-  searchContent(json_object, keywords, matchingTags);
-
+  searchContent(json_object, keywords, matchingTags, [], {}); // Initialize empty path
   return matchingTags;
 }
 
+function findMerkleWitness(merkleTree, leaf) {
+    const proofsarray = generateMerkleProof(merkleTree, leaf);
+    return proofsarray;
+  }
 
-function main() {
+
+async function main() {
     parsedHTML()
       .then((parsed_value) => {
         const leaves =  extractValues(parsed_value);
-        const keywords = extractKeyWords(parsed_value);
-        console.log("Keywords ", keywords)
         console.log("Leaves ", leaves)
-        console.log("Parsed HTML ", parsed_value)
-        const generatedTree = generateMerkleTreeFromLeaves(leaves);
-        console.log('Generated Merkle Tree:', generatedTree);
+        const keywords = extractKeyWords(parsed_value);
+        //console.log("Keywords ", keywords)
+        //console.log("Leaves ", leaves)
+        //console.log("Parsed HTML ", parsed_value)
+        generateMerkleTreeFromLeaves(leaves).then((generatedTree) => {
+        
+        console.log('Generated Merkle Tree:', generatedTree.root);
+       // console.log('Generated Merkle Tree:', generatedTree);
+        const tagsFound = tagsThatIncludeKeywords(parsed_value, keywords);
+        //console.log("Tags that include keywords ", tagsThatIncludeKeywords(parsed_value, keywords))
+        console.log("root ", generatedTree)
 
-        console.log("Tags that include keywords ", tagsThatIncludeKeywords(parsed_value, keywords))
+        const leavesArray = generatedTree.leavesArray;
+
+        for (let i = 0; i < leavesArray.length; i++) {
+          console.log("Leaf ", i, " : ", leavesArray[i]);
+        }
+        for (const i of tagsFound) {
+          console.log("Tag found ", sha256(i.fulltag));
+          console.log("Tag found ", i.fulltag);
+          //console.log("Tag found ",  findMerkleWitness(generatedTree, i.fulltag));
+        }
+
+      });
 
       })
       .catch((error) => {
