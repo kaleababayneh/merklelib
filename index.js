@@ -31,15 +31,6 @@ function extract(obj, result, path = [], childCounters = {}) {
     childCounters[currentType] = (childCounters[currentType] || 0) + 1;
     let tagRepresentation = `${currentType}:${childCounters[currentType]}`;
 
-    const hasDirectTextContent = obj.content && (
-      typeof obj.content === 'string' || 
-      (Array.isArray(obj.content) && obj.content.some(item => typeof item === 'string' && item.trim()))
-    );
-    
-    if (hasDirectTextContent) {
-      tagRepresentation += `:${childCounters[currentType]}`;
-    }
-
     if (obj.attributes && Object.keys(obj.attributes).length > 0) {
       const attributeStrings = Object.entries(obj.attributes).map(
         ([key, value]) => `${key}=${value}`
@@ -130,7 +121,7 @@ function searchContent(obj, keywords, matchingTags, path = [], childCounters = {
   
   const currentType = obj.type;
   if (currentType) {
-    // Build path representation like in extract()
+
     childCounters[currentType] = (childCounters[currentType] || 0) + 1;
     let tagRepresentation = `${currentType}:${childCounters[currentType]}`;
     
@@ -143,7 +134,6 @@ function searchContent(obj, keywords, matchingTags, path = [], childCounters = {
     
     path.push(tagRepresentation);
     
-    // Existing content extraction
     let foundKeyword = null;
     let textContent = '';
     
@@ -166,9 +156,7 @@ function searchContent(obj, keywords, matchingTags, path = [], childCounters = {
     
     if (foundKeyword) {
       const cleanedContent = textContent.trim().replace(/\s+/g, '');
-      // Include the full tag path in results
       matchingTags.push({
-       // tag: obj.type,
         keyword: foundKeyword,
         fulltag: `${path.join('>')}:${cleanedContent}`
       });
@@ -216,15 +204,11 @@ async function main() {
         const leaves =  extractValues(parsed_value);
         console.log("Leaves ", leaves)
         const keywords = extractKeyWords(parsed_value);
-        //console.log("Keywords ", keywords)
-        //console.log("Leaves ", leaves)
-        //console.log("Parsed HTML ", parsed_value)
+       
         generateMerkleTreeFromLeaves(leaves).then((generatedTree) => {
         
         console.log('Generated Merkle Tree:', generatedTree.root);
-       // console.log('Generated Merkle Tree:', generatedTree);
-        const tagsFound = tagsThatIncludeKeywords(parsed_value, keywords);
-        //console.log("Tags that include keywords ", tagsThatIncludeKeywords(parsed_value, keywords))
+
         console.log("root ", generatedTree)
 
         const leavesArray = generatedTree.leavesArray;
@@ -235,7 +219,11 @@ async function main() {
         for (const i of tagsFound) {
           console.log("Tag found ", sha256(i.fulltag));
           console.log("Tag found ", i.fulltag);
-          //console.log("Tag found ",  findMerkleWitness(generatedTree, i.fulltag));
+          findMerkleWitness(generatedTree, i.fulltag).then((proof) => {
+            console.log("we are here");
+            console.log("Merkle proof for leaf ", sha256(i.fulltag), " : ", proof);
+          }
+          );
         }
 
       });
